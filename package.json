@@ -1,7 +1,7 @@
 {
   "name": "porquim-ia-whatsapp",
   "version": "1.0.0",
-  "description": "Bot de finanças no WhatsApp com IA e SQLite",
+  "description": "Bot de financas WhatsApp",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -13,5 +13,8 @@
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "whatsapp-web.js": "^1.26.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
