@@ -29,8 +29,10 @@ async function initDb() {
     console.log('🗄️ Banco de Dados SQLite conectado com sucesso!');
 }
 
+// Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Inicialização do Cliente do WhatsApp (com configurações para ambiente de nuvem/Render)
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
@@ -48,7 +50,7 @@ const client = new Client({
     }
 });
 
-// Geração do QR Code
+// Evento de geração do QR Code no terminal
 client.on('qr', (qr) => {
     console.log('📱 Escaneie o QR Code abaixo pelo WhatsApp (no log do servidor):');
     qrcode.generate(qr, { small: true });
@@ -60,19 +62,20 @@ client.on('ready', () => {
 
 // Processamento de Mensagens
 client.on('message', async (msg) => {
+    // Ignora mensagens de grupos e status
     if (msg.from.endsWith('@g.us') || msg.isStatus) return;
 
     try {
         const userId = msg.from;
         const textoMsg = msg.body;
 
-        // Consulta últimos lançamentos
+        // Consulta os últimos 5 lançamentos do usuário
         const ultimosGastos = await db.all(
             'SELECT tipo, valor, categoria, descricao, data FROM transacoes WHERE usuario = ? ORDER BY id DESC LIMIT 5',
             [userId]
         );
 
-        // Consulta soma total de saídas do mês atual
+        // Consulta soma total de entradas e saídas do mês atual
         const resumoMes = await db.get(
             `SELECT 
                 SUM(CASE WHEN tipo = 'saida' THEN valor ELSE 0 END) as total_saidas,
@@ -92,7 +95,7 @@ DADOS LOCAIS DO USUÁRIO:
 
 REGRAS DE RESPOSTA:
 1. Seja sempre amigável, direto e use emojis (🐷, 💰, 📊).
-2. Se o usuário estiver registrando um gasto ou ganho, você DEVE incluir ao FINAL da resposta a linha de instrução:
+2. Se o usuário estiver registrando um gasto ou ganho, você DEVE incluir ao FINAL da resposta a linha de instrução exatamente neste formato:
 REGISTRO|[entrada/saida]|[valor_numerico]|[categoria]|[descricao]
 
 Exemplo para "gastei 20 no almoço":
@@ -108,7 +111,7 @@ REGISTRO|saida|20.00|Alimentação|almoço
         const result = await model.generateContent(textoMsg);
         let respostaTexto = result.response.text();
 
-        // Gravando transação no banco de dados local
+        // Gravando transação no banco de dados local caso haja instrução REGISTRO|
         if (respostaTexto.includes('REGISTRO|')) {
             const linhas = respostaTexto.split('\n');
             const linhaComando = linhas.find(l => l.startsWith('REGISTRO|'));
@@ -131,4 +134,5 @@ REGISTRO|saida|20.00|Alimentação|almoço
     }
 });
 
+// Inicializa o banco de dados e depois o cliente do WhatsApp
 initDb().then(() => client.initialize());
