@@ -6,7 +6,7 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
 const express = require('express');
-const puppeteer = require('puppeteer');
+const fs = require('fs');
 
 // Servidor Web simples para manter o Render ativo
 const app = express();
@@ -46,12 +46,30 @@ async function initDb() {
 // Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Inicialização do Cliente do WhatsApp com caminho dinâmico do Chrome
+// Localização dinâmica do Chrome no ambiente do Render
+function getExecutablePath() {
+    const possiblePaths = [
+        '/opt/render/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+        '/opt/render/project/src/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser'
+    ];
+
+    for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+            console.log(`🔍 Chrome encontrado em: ${p}`);
+            return p;
+        }
+    }
+    return undefined;
+}
+
+// Inicialização do Cliente do WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
         headless: true,
-        executablePath: puppeteer.executablePath(),
+        executablePath: getExecutablePath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
