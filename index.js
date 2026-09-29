@@ -1,71 +1,18 @@
 require('dotenv').config();
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const QRCode = require('qrcode');
+const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
-const express = require('express');
-const fs = require('fs');
+const axios = require('axios'); // Para enviar mensagens de volta para a API
 
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 10000;
 
-let qrCodeImage = null;
-
-app.get('/', (req, res) => {
-    if (qrCodeImage) {
-        res.send(`
-            <!DOCTYPE html>
-            <html lang="pt-br">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Porquim IA - QR Code</title>
-                <style>
-                    body { font-family: sans-serif; text-align: center; background: #f4f4f9; padding-top: 50px; }
-                    .card { background: white; padding: 20px; display: inline-block; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-                    img { width: 280px; height: 280px; }
-                </style>
-                <meta http-equiv="refresh" content="15">
-            </head>
-            <body>
-                <div class="card">
-                    <h2>🐷 Porquim IA - Conectar WhatsApp</h2>
-                    <p>Abra o WhatsApp no celular > Aparelhos Conectados > Conectar um aparelho</p>
-                    <img src="${qrCodeImage}" alt="QR Code WhatsApp" />
-                    <p style="font-size: 12px; color: #666;">A página atualiza automaticamente a cada 15 segundos.</p>
-                </div>
-            </body>
-            </html>
-        `);
-    } else {
-        res.send(`
-            <!DOCTYPE html>
-            <html lang="pt-br">
-            <head>
-                <meta charset="UTF-8">
-                <meta http-equiv="refresh" content="5">
-                <title>Porquim IA</title>
-                <style>
-                    body { font-family: sans-serif; text-align: center; padding-top: 50px; }
-                </style>
-            </head>
-            <body>
-                <h2>🐷 Porquim IA está online e pronto para uso!</h2>
-                <p>Se você acabou de conectar, o serviço já está pronto para receber mensagens.</p>
-            </body>
-            </html>
-        `);
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`🌐 Servidor Web rodando na porta ${PORT}`);
-});
-
+// Configuração do Banco de Dados
 let db;
-
 async function initDb() {
     db = await open({
         filename: path.join(__dirname, 'dados_porquim.db'),
@@ -88,84 +35,81 @@ async function initDb() {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-function getExecutablePath() {
-    const baseDirs = [
-        '/opt/render/project/src/.cache/puppeteer/chrome',
-        '/opt/render/.cache/puppeteer/chrome'
-    ];
+// 1. PÁGINA HTML COMPLETA (Dashboard / Painel de Conexão)
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt-br">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Porquim IA - Painel WhatsApp</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 40px 20px; }
+                .container { max-width: 450px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+                h2 { color: #333; margin-top: 0; }
+                .qr-box { margin: 20px 0; min-height: 250px; display: flex; align-items: center; justify-content: center; background: #fafafa; border: 2px dashed #ddd; border-radius: 12px; }
+                img { max-width: 240px; border-radius: 8px; }
+                .status { font-weight: bold; padding: 8px 16px; border-radius: 20px; display: inline-block; margin-bottom: 15px; }
+                .status.online { background: #e6f4ea; color: #137333; }
+                .status.offline { background: #feefae; color: #b06000; }
+                button { background-color: #0d6efd; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.2s; }
+                button:hover { background-color: #0b5ed7; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2>🐷 Porquim IA - Webhook</h2>
+                <div id="status-badge" class="status offline">Status: Desconectado</div>
+                <div class="qr-box" id="qr-container">
+                    <p>Clique abaixo para gerar o QR Code</p>
+                </div>
+                <button onclick="gerarQrCode()">Gerar QR Code</button>
+            </div>
 
-    for (const baseDir of baseDirs) {
-        if (fs.existsSync(baseDir)) {
-            const versions = fs.readdirSync(baseDir);
-            for (const ver of versions) {
-                const chromePath = path.join(baseDir, ver, 'chrome-linux64', 'chrome');
-                if (fs.existsSync(chromePath)) {
-                    console.log(`🔍 Chrome encontrado em: ${chromePath}`);
-                    return chromePath;
+            <script>
+                async function gerarQrCode() {
+                    const qrContainer = document.getElementById('qr-container');
+                    qrContainer.innerHTML = '<p>Carregando QR Code...</p>';
+                    
+                    try {
+                        // Exemplo puxando da rota da API
+                        const response = await fetch('/api/get-qrcode');
+                        const data = await response.json();
+
+                        if (data.qrcode) {
+                            qrContainer.innerHTML = \`<img src="\${data.qrcode}" alt="QR Code WhatsApp" />\`;
+                        } else if (data.connected) {
+                            document.getElementById('status-badge').className = 'status online';
+                            document.getElementById('status-badge').innerText = 'Status: Online e Conectado!';
+                            qrContainer.innerHTML = '<p>✅ Aparelho já está conectado!</p>';
+                        }
+                    } catch (err) {
+                        qrContainer.innerHTML = '<p style="color:red">Erro ao conectar com a API</p>';
+                    }
                 }
-            }
-        }
-    }
-
-    const systemPaths = [
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium'
-    ];
-
-    for (const sysPath of systemPaths) {
-        if (fs.existsSync(sysPath)) {
-            console.log(`🔍 Chrome do sistema encontrado em: ${sysPath}`);
-            return sysPath;
-        }
-    }
-
-    return undefined;
-}
-
-const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    },
-    puppeteer: {
-        headless: true,
-        executablePath: getExecutablePath(),
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-extensions'
-        ]
-    }
+            </script>
+        </body>
+        </html>
+    `);
 });
 
-client.on('qr', async (qr) => {
-    console.log('📱 Novo QR Code gerado!');
-    qrCodeImage = await QRCode.toDataURL(qr);
-});
-
-client.on('ready', () => {
-    console.log('✅ Porquim IA está online e pronto para uso!');
-    qrCodeImage = null;
-});
-
-client.on('message', async (msg) => {
-    if (msg.from.endsWith('@g.us') || msg.isStatus) return;
+// 2. ROTA DE WEBHOOK (Recebe as mensagens via POST do serviço da API)
+app.post('/webhook', async (req, res) => {
+    res.sendStatus(200); // Responde imediatamente HTTP 200 para a API não reenviar
 
     try {
-        const userId = msg.from;
-        const textoMsg = msg.body;
+        // Exemplo de payload vindo da Evolution API / Z-API
+        const body = req.body;
+        const textoMsg = body.data?.message?.conversation || body.message?.text;
+        const from = body.data?.key?.remoteJid || body.phone;
 
+        if (!textoMsg || !from || from.includes('@g.us')) return;
+
+        // Consulta últimos gastos e resumo
         const ultimosGastos = await db.all(
             'SELECT tipo, valor, categoria, descricao, data FROM transacoes WHERE usuario = ? ORDER BY id DESC LIMIT 5',
-            [userId]
+            [from]
         );
 
         const resumoMes = await db.get(
@@ -174,12 +118,12 @@ client.on('message', async (msg) => {
                 SUM(CASE WHEN tipo = 'entrada' THEN valor ELSE 0 END) as total_entradas
              FROM transacoes 
              WHERE usuario = ? AND strftime('%Y-%m', data) = strftime('%Y-%m', 'now')`,
-            [userId]
+            [from]
         );
 
         const promptContexto = `
 Você é o "Porquim IA", assistente virtual carismático e especialista em finanças pessoais.
-Usuário atual: ${userId}
+Usuário atual: ${from}
 
 DADOS LOCAIS DO USUÁRIO:
 - Resumo deste mês: Total Entradas = R$ ${resumoMes?.total_entradas || 0}, Total Saídas = R$ ${resumoMes?.total_saidas || 0}
@@ -189,10 +133,6 @@ REGRAS DE RESPOSTA:
 1. Seja sempre amigável, direto e use emojis (🐷, 💰, 📊).
 2. Se o usuário estiver registrando um gasto ou ganho, você DEVE incluir ao FINAL da resposta a linha de instrução exatamente neste formato:
 REGISTRO|[entrada/saida]|[valor_numerico]|[categoria]|[descricao]
-
-Exemplo para "gastei 20 no almoço":
-Muito bem! Anotei seu gasto de R$ 20,00 na categoria Alimentação. 🐷
-REGISTRO|saida|20.00|Alimentação|almoço
 `;
 
         const model = genAI.getGenerativeModel({ 
@@ -212,17 +152,24 @@ REGISTRO|saida|20.00|Alimentação|almoço
                 const [, tipo, valor, categoria, descricao] = linhaComando.split('|');
                 await db.run(
                     'INSERT INTO transacoes (usuario, tipo, valor, categoria, descricao) VALUES (?, ?, ?, ?, ?)',
-                    [userId, tipo, parseFloat(valor), categoria, descricao]
+                    [from, tipo, parseFloat(valor), categoria, descricao]
                 );
             }
         }
 
-        await msg.reply(respostaTexto);
+        // Envia a resposta de volta usando a API externa (Evolution API / Z-API)
+        /* 
+        await axios.post('URL_DA_API_EXTERNA/message/sendText', {
+            number: from,
+            text: respostaTexto
+        }); 
+        */
 
     } catch (error) {
-        console.error('Erro na mensagem:', error);
-        await msg.reply('🐷 Ops, tive um pequeno problema técnico. Pode repetir?');
+        console.error('Erro no Webhook:', error);
     }
 });
 
-initDb().then(() => client.initialize());
+initDb().then(() => {
+    app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
+});
