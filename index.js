@@ -89,20 +89,39 @@ async function initDb() {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Função aprimorada para buscar dinamicamente qualquer pasta do Chrome baixada no Render
 function getExecutablePath() {
-    const possiblePaths = [
-        '/opt/render/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
-        '/opt/render/project/src/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium-browser'
+    const baseDirs = [
+        '/opt/render/project/src/.cache/puppeteer/chrome',
+        '/opt/render/.cache/puppeteer/chrome'
     ];
 
-    for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-            console.log(`🔍 Chrome encontrado em: ${p}`);
-            return p;
+    for (const baseDir of baseDirs) {
+        if (fs.existsSync(baseDir)) {
+            const versions = fs.readdirSync(baseDir);
+            for (const ver of versions) {
+                const chromePath = path.join(baseDir, ver, 'chrome-linux64', 'chrome');
+                if (fs.existsSync(chromePath)) {
+                    console.log(`🔍 Chrome encontrado em: ${chromePath}`);
+                    return chromePath;
+                }
+            }
         }
     }
+
+    const systemPaths = [
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium'
+    ];
+
+    for (const sysPath of systemPaths) {
+        if (fs.existsSync(sysPath)) {
+            console.log(`🔍 Chrome do sistema encontrado em: ${sysPath}`);
+            return sysPath;
+        }
+    }
+
     return undefined;
 }
 
