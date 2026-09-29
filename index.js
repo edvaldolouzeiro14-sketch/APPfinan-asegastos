@@ -89,7 +89,6 @@ async function initDb() {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Função aprimorada para buscar dinamicamente qualquer pasta do Chrome baixada no Render
 function getExecutablePath() {
     const baseDirs = [
         '/opt/render/project/src/.cache/puppeteer/chrome',
@@ -127,6 +126,8 @@ function getExecutablePath() {
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+    takeoverOnConflict: true,
+    takeoverTimeoutMs: 0,
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
