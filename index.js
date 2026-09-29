@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
@@ -8,12 +8,58 @@ const path = require('path');
 const express = require('express');
 const fs = require('fs');
 
-// Servidor Web simples para manter o Render ativo
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Variável para armazenar a imagem base64 do QR Code
+let qrCodeImage = null;
+
+// Rota principal: Exibe o QR Code em formato HTML até ser escaneado
 app.get('/', (req, res) => {
-    res.send('🐷 Porquim IA está online e funcionando!');
+    if (qrCodeImage) {
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="pt-br">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Porquim IA - QR Code</title>
+                <style>
+                    body { font-family: sans-serif; text-align: center; background: #f4f4f9; padding-top: 50px; }
+                    .card { background: white; padding: 20px; display: inline-block; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+                    img { width: 280px; height: 280px; }
+                </style>
+                <meta http-equiv="refresh" content="15">
+            </head>
+            <body>
+                <div class="card">
+                    <h2>🐷 Porquim IA - Conectar WhatsApp</h2>
+                    <p>Abra o WhatsApp no celular > Aparelhos Conectados > Conectar um aparelho</p>
+                    <img src="${qrCodeImage}" alt="QR Code WhatsApp" />
+                    <p style="font-size: 12px; color: #666;">A página atualiza automaticamente a cada 15 segundos.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    } else {
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="pt-br">
+            <head>
+                <meta charset="UTF-8">
+                <meta http-equiv="refresh" content="5">
+                <title>Porquim IA</title>
+                <style>
+                    body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+                </style>
+            </head>
+            <body>
+                <h2>🐷 Porquim IA está online e pronto para uso!</h2>
+                <p>Se você acabou de iniciar o servidor, aguarde alguns segundos até o QR Code carregar...</p>
+            </body>
+            </html>
+        `);
+    }
 });
 
 app.listen(PORT, () => {
@@ -22,7 +68,6 @@ app.listen(PORT, () => {
 
 let db;
 
-// Inicialização do Banco SQLite
 async function initDb() {
     db = await open({
         filename: path.join(__dirname, 'dados_porquim.db'),
@@ -43,10 +88,8 @@ async function initDb() {
     console.log('🗄️ Banco de Dados SQLite conectado com sucesso!');
 }
 
-// Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Localização dinâmica do Chrome no ambiente do Render
 function getExecutablePath() {
     const possiblePaths = [
         '/opt/render/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
@@ -64,7 +107,6 @@ function getExecutablePath() {
     return undefined;
 }
 
-// Inicialização do Cliente do WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
@@ -83,17 +125,17 @@ const client = new Client({
     }
 });
 
-// Evento de geração do QR Code no terminal
-client.on('qr', (qr) => {
-    console.log('📱 Escaneie o QR Code abaixo pelo WhatsApp (no log do servidor):');
-    qrcode.generate(qr, { small: true });
+// Gera a imagem do QR Code para exibição na web
+client.on('qr', async (qr) => {
+    console.log('📱 Novo QR Code gerado! Acesse pela URL da sua aplicação no navegador.');
+    qrCodeImage = await QRCode.toDataURL(qr);
 });
 
 client.on('ready', () => {
     console.log('✅ Porquim IA está online!');
+    qrCodeImage = null; // Limpa o QR Code após a conexão bem-sucedida
 });
 
-// Processamento de Mensagens
 client.on('message', async (msg) => {
     if (msg.from.endsWith('@g.us') || msg.isStatus) return;
 
@@ -163,5 +205,4 @@ REGISTRO|saida|20.00|Alimentação|almoço
     }
 });
 
-// Inicializa o banco de dados e depois o cliente do WhatsApp
 initDb().then(() => client.initialize());
