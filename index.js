@@ -32,11 +32,12 @@ async function initDb() {
 // Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Inicialização do Cliente do WhatsApp (com configurações para ambiente de nuvem/Render)
+// Inicialização do Cliente do WhatsApp com o caminho fixo do Chrome no Render
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
         headless: true,
+        executablePath: '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.31/chrome-linux64/chrome',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
