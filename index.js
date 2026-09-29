@@ -11,10 +11,9 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Variável para armazenar a imagem base64 do QR Code
 let qrCodeImage = null;
 
-// Rota principal: Exibe o QR Code em formato HTML até ser escaneado
+// Rota principal: Exibe o QR Code em HTML
 app.get('/', (req, res) => {
     if (qrCodeImage) {
         res.send(`
@@ -55,7 +54,7 @@ app.get('/', (req, res) => {
             </head>
             <body>
                 <h2>🐷 Porquim IA está online e pronto para uso!</h2>
-                <p>Se você acabou de iniciar o servidor, aguarde alguns segundos até o QR Code carregar...</p>
+                <p>Se você acabou de conectar, o serviço já está pronto para receber mensagens.</p>
             </body>
             </html>
         `);
@@ -109,6 +108,10 @@ function getExecutablePath() {
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    },
     puppeteer: {
         headless: true,
         executablePath: getExecutablePath(),
@@ -120,12 +123,13 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--unhandled-rejections=strict',
+            '--disable-extensions'
         ]
     }
 });
 
-// Gera a imagem do QR Code para exibição na web
 client.on('qr', async (qr) => {
     console.log('📱 Novo QR Code gerado! Acesse pela URL da sua aplicação no navegador.');
     qrCodeImage = await QRCode.toDataURL(qr);
@@ -133,7 +137,7 @@ client.on('qr', async (qr) => {
 
 client.on('ready', () => {
     console.log('✅ Porquim IA está online!');
-    qrCodeImage = null; // Limpa o QR Code após a conexão bem-sucedida
+    qrCodeImage = null;
 });
 
 client.on('message', async (msg) => {
