@@ -6,6 +6,7 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
 const express = require('express');
+const puppeteer = require('puppeteer');
 
 // Servidor Web simples para manter o Render ativo
 const app = express();
@@ -45,15 +46,12 @@ async function initDb() {
 // Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Caminho para o executável do Chrome baixado no Render
-const chromePath = path.join(__dirname, '.cache', 'puppeteer', 'chrome', 'linux-154.0.8037.57', 'chrome-linux64', 'chrome');
-
-// Inicialização do Cliente do WhatsApp
+// Inicialização do Cliente do WhatsApp com caminho dinâmico do Chrome
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
         headless: true,
-        executablePath: chromePath,
+        executablePath: puppeteer.executablePath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
