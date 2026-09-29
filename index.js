@@ -145,7 +145,10 @@ const client = new Client({
             '--single-process',
             '--disable-gpu',
             '--unhandled-rejections=strict',
-            '--disable-extensions'
+            '--disable-extensions',
+            '--js-flags="--max-old-space-size=256"',
+            '--disable-site-isolation-trials',
+            '--disable-web-security'
         ]
     }
 });
