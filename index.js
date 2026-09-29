@@ -5,6 +5,19 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
+const express = require('express');
+
+// Servidor Web simples para manter o Render ativo
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.get('/', (req, res) => {
+    res.send('🐷 Porquim IA está online e funcionando!');
+});
+
+app.listen(PORT, () => {
+    console.log(`🌐 Servidor Web rodando na porta ${PORT}`);
+});
 
 let db;
 
@@ -32,7 +45,7 @@ async function initDb() {
 // Inicialização da API do Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Caminho para o executável do Chrome baixado na pasta do projeto no Render
+// Caminho para o executável do Chrome baixado no Render
 const chromePath = path.join(__dirname, '.cache', 'puppeteer', 'chrome', 'linux-154.0.8037.57', 'chrome-linux64', 'chrome');
 
 // Inicialização do Cliente do WhatsApp
@@ -66,20 +79,17 @@ client.on('ready', () => {
 
 // Processamento de Mensagens
 client.on('message', async (msg) => {
-    // Ignora mensagens de grupos e status
     if (msg.from.endsWith('@g.us') || msg.isStatus) return;
 
     try {
         const userId = msg.from;
         const textoMsg = msg.body;
 
-        // Consulta os últimos 5 lançamentos do usuário
         const ultimosGastos = await db.all(
             'SELECT tipo, valor, categoria, descricao, data FROM transacoes WHERE usuario = ? ORDER BY id DESC LIMIT 5',
             [userId]
         );
 
-        // Consulta soma total de entradas e saídas do mês atual
         const resumoMes = await db.get(
             `SELECT 
                 SUM(CASE WHEN tipo = 'saida' THEN valor ELSE 0 END) as total_saidas,
@@ -115,7 +125,6 @@ REGISTRO|saida|20.00|Alimentação|almoço
         const result = await model.generateContent(textoMsg);
         let respostaTexto = result.response.text();
 
-        // Gravando transação no banco de dados local caso haja instrução REGISTRO|
         if (respostaTexto.includes('REGISTRO|')) {
             const linhas = respostaTexto.split('\n');
             const linhaComando = linhas.find(l => l.startsWith('REGISTRO|'));
