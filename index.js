@@ -13,7 +13,6 @@ const PORT = process.env.PORT || 10000;
 
 let qrCodeImage = null;
 
-// Rota principal: Exibe o QR Code em HTML
 app.get('/', (req, res) => {
     if (qrCodeImage) {
         res.send(`
@@ -126,8 +125,6 @@ function getExecutablePath() {
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-    takeoverOnConflict: true,
-    takeoverTimeoutMs: 0,
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
@@ -144,22 +141,18 @@ const client = new Client({
             '--no-zygote',
             '--single-process',
             '--disable-gpu',
-            '--unhandled-rejections=strict',
-            '--disable-extensions',
-            '--js-flags="--max-old-space-size=256"',
-            '--disable-site-isolation-trials',
-            '--disable-web-security'
+            '--disable-extensions'
         ]
     }
 });
 
 client.on('qr', async (qr) => {
-    console.log('📱 Novo QR Code gerado! Acesse pela URL da sua aplicação no navegador.');
+    console.log('📱 Novo QR Code gerado!');
     qrCodeImage = await QRCode.toDataURL(qr);
 });
 
 client.on('ready', () => {
-    console.log('✅ Porquim IA está online!');
+    console.log('✅ Porquim IA está online e pronto para uso!');
     qrCodeImage = null;
 });
 
